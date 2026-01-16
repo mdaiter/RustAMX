@@ -8,37 +8,58 @@ Rust bindings for Apple AMX (Apple Matrix Coprocessor) on Apple Silicon.
 cargo build
 cargo test
 cargo clippy
+cargo doc --open
 ```
 
-## Architecture
+## Public API
 
-- `src/lib.rs` - Single-file library with all AMX bindings
+```rust
+// High-level (safe)
+use mac_amx::{Matrix, is_available, detect, AmxVersion};
 
-### Code Structure
+let a = Matrix::identity(64);
+let b = Matrix::fill(64, 64, 2.0);
+let c = a.matmul(&b);
 
-1. **Detection** - `detect()`, `is_available()` via sysctl
-2. **Raw instructions** - `amx_ldx`, `amx_fma32`, etc. (inline asm)
-3. **Mid-level ops** - `ops::ldx()`, `ops::fma32()` with operand encoding
-4. **SGEMM** - `sgemm::matmul()` for matrix multiplication
-5. **AmxGuard** - RAII for AMX enable/disable
+// Mid-level (unsafe, requires AmxGuard)
+use mac_amx::{AmxGuard, ops};
 
-### AMX Register Layout
+let _guard = AmxGuard::new();
+unsafe {
+    ops::ldx(ptr, 0, false);
+    ops::fma32(0, 0, 0, false);
+}
 
-- X registers: 8 x 64 bytes (load sources)
-- Y registers: 8 x 64 bytes (load sources)
-- Z registers: 64 x 64 bytes (accumulators)
+// Low-level (raw instructions)
+use mac_amx::raw;
+```
 
-For f32 FMA matrix mode with z_row=0, Z is accessed at rows `j*4` (interleaved).
+## Module Structure
 
-## Key Files
+```
+src/
+  lib.rs      # Matrix type, AmxGuard, matmul implementation
+  detect.rs   # AMX detection via sysctl
+  ops.rs      # Mid-level ops with operand encoding
+  raw.rs      # Raw AMX instructions (inline asm)
+```
 
-- `amx/` - Reference C implementation and documentation (read-only)
-- `amx/Instructions.md` - Instruction reference
-- `amx/fma.md` - FMA instruction details including Z indexing
+## Key Types
 
-## Style
+- `Matrix` - Row-major f32 matrix with AMX-accelerated matmul
+- `AmxGuard` - RAII guard for AMX enable/disable
+- `AmxVersion` - M1/M2/M3/M4/Unknown
 
-- Prefer iterators over index loops where memory is contiguous
-- Use `copy_from_slice` for bulk copies
-- Strided/gathered access requires indexed loops
-- All public unsafe fns need AMX enabled first (except `amx_set`)
+## AMX Register Layout
+
+- X: 8 × 64 bytes (512 bytes total)
+- Y: 8 × 64 bytes (512 bytes total)
+- Z: 64 × 64 bytes (4096 bytes total, accumulator)
+
+For f32 FMA matrix mode, Z rows are accessed at `j*4 + (z_row & 3)`.
+
+## Reference
+
+- `amx/` - C reference implementation (read-only)
+- `amx/Instructions.md` - Full instruction reference
+- `amx/fma.md` - FMA encoding details
