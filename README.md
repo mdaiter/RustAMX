@@ -21,7 +21,7 @@ AMX is an undocumented SIMD coprocessor in M1/M2/M3/M4 chips that accelerates ma
 
 ```toml
 [dependencies]
-mac_amx = { git = "https://github.com/youruser/mac_amx" }
+mac_amx = { git = "https://github.com/mdaiter/RustAMX" }
 ```
 
 ## Usage
