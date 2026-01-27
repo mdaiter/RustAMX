@@ -1,0 +1,4 @@
+module CAMX {
+    header "amx.h"
+    export *
+}
